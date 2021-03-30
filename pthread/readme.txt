@@ -1,1 +1,0 @@
-Just do some pratice with the pthread.
