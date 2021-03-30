@@ -1,5 +1,7 @@
-#include <stdio.h>
-#include <pthread.h>
+#include<pthread.h>
+#include<unistd.h>
+#include<stdio.h>
+#include<stdlib.h>
 
 unsigned int count = 0;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
