@@ -66,6 +66,26 @@ __int pthread_barrier_destroy(pthread_barrier_t *barrier);__<br>
 #### 基本操作
 __int pthread_barrier_wait(pthread_barrier_t *barrier);__<br>
 
+## 线程控制
+
+### 线程属性
+
+#### 初始化以及反初始化函数
+__int pthread_attr_init(pthread_attr_t *attr);__<br>
+__int pthread_attr_destory(pthread_attr_t *attr);__<br>
+
+#### 基本操作
+__int pthread_attr_setdetachstate(pthread_attr_t *tattr,int detachstate);__<br>
+__int pthread_attr_getdetachstate(const pthread_attr_t *tattr,int *detachstate)__<br>
+**PTHREAD_CREATE_DETACHED**<br>
+分离线程没有被其他的线程所等待，自己运行结束了，线程也就终止了，马上释放系统资源。应该根据自己的需要，选择适当的分离状态<br>
+**PTHREAD_CREATE_JOINABLE**<br>
+线程的默认属性是非分离状态，这种情况下，原有的线程等待创建的线程结束。只有当pthread_join()函数返回时，创建的线程才算终止，才能释放自己占用的系统资源。<br>
+如果设置一个线程为分离线程，而这个线程运行又非常快，它很可能在pthread_create函数返回之前就终止了，它终止以后就可能将线程号和系统资源移交给其他的线程使用，这样调用pthread_create的线程就得到了错误的线程号。要避免这种情况可以采取一定的同步措施，最简单的方法之一是可以在被创建的线程里调用pthread_cond_timewait函数，让这个线程等待一会儿，留出足够的时间让函数pthread_create返回。设置一段等待时间，是在多线程编程里常用的方法。但是注意不要使用诸如wait()之类的函数，它们是使整个进程睡眠，并不能解决线程同步的问题。<br>
+__int pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize);__<br>
+__int pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize);__<br>
+
+
 
 
 
