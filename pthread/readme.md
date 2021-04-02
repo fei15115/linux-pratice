@@ -228,3 +228,29 @@ robustness 定义在互斥锁的持有者“死亡”时的行为。pthread.h �
 PTHREAD_MUTEX_STALLED_NP： 如果互斥锁的持有者死亡,则以后对pthread_mutex_lock() 的所有调用将以不确定的方式被阻塞。<br>
 PTHREAD_MUTEX_ROBUST_NP： 如果互斥锁的持有者“死亡”了，或者持有这样的互斥锁的进程unmap了互斥锁所在的共享内存或者持有这样的互斥锁的进程执行了exec调用，则会解除锁定该互斥锁。互斥锁的下一个持有者将获取该互斥锁,并返回错误EOWNWERDEAD。<br>
 如果互斥锁具有PTHREAD_MUTEX_ROBUST_NP的属性，则应用程序在获取该锁时必须检查pthread_mutex_lock 的返回代码看获取锁时是否返回了EOWNWERDEAD错误。如果是，则互斥锁的新的持有者应使该互斥锁所保护的状态保持一致。因为互斥锁的上一个持有者“死亡”时互斥锁所保护的状态可能出于不一致的状态。如果互斥锁的新的持有者能够使该状态保持一致,请针对该互斥锁调用pthread_mutex_consistent_np(),并解除锁定该互斥锁。如果互斥锁的新的持有者无法使该状态保持一致,请勿针对该互斥锁调用pthread_mutex_consistent_np(),而是解除锁定该互斥锁。所有等待的线程都将被唤醒,以后对pthread_mutex_lock() 的所有调用都将无法获取该互斥锁。返回错误为ENOTRECOVERABLE。如果一个线程获取了互斥锁，但是获取时得到了EOWNERDEAD的错误，然后它终止并且没有释放互斥锁 ,则下一个持有者获取该锁时将返回代码EOWNERDEAD。<br>
+
+### 读写锁属性
+
+#### 读写锁属性的初始化和反初始化
+__int pthread_rwlockattr_init(pthread_rwlockattr_t *attr);__
+__int pthread_rwlockattr_destroy(pthread_rwlockattr_t *attr);__
+#### 设置互斥量共享属性
+__int pthread_rwlockattr_setpshared(pthread_rwlockattr_t  *attr,int  pshared);__  
+__int pthread_rwlockattr_getpshared(const pthread_rwlockattr_t  *attr,int *pshared);__
+__PTHREAD_PROCESS_SHARED__
+    描述:允许可访问用于分配读写锁的内存的任何线程对读写锁进行处理。即使该锁是在由多个进程共享的内存中分配的，也允许对其进行处理。
+__PTHREAD_PROCESS_PRIVATE__
+    描述:读写锁只能由某些线程处理，这些线程与初始化该锁的线程在同一进程中创建。如果不同进程的线程尝试对此类读写锁进行处理，则其行为是不确定的。由进程共享的属性的缺省值为 __PTHREAD_PROCESS_PRIVATE__。
+
+### 条件变量属性
+
+#### 条件变量属性的初始化和反初始化
+__int pthread_condattr_init(pthread_condattr_t  *attr);__
+__int pthread_condattr_destroy(pthread_condattr_t  *attr);__
+#### 设置互斥量共享属性
+__int pthread_condattr_getpshared(const pthread_condattr_t *restrict attr,int *restrict pshared);__  
+__int pthread_condattr_setpshared(pthread_condattr_t *attr,int pshared);__
+__PTHREAD_PROCESS_SHARED__
+    描述:允许可访问用于分配读写锁的内存的任何线程对读写锁进行处理。即使该锁是在由多个进程共享的内存中分配的，也允许对其进行处理。
+__PTHREAD_PROCESS_PRIVATE__
+    描述:读写锁只能由某些线程处理，这些线程与初始化该锁的线程在同一进程中创建。如果不同进程的线程尝试对此类读写锁进行处理，则其行为是不确定的。由进程共享的属性的缺省值为 __PTHREAD_PROCESS_PRIVATE__。
