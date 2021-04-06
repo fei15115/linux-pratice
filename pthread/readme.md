@@ -41,6 +41,22 @@ __int pthread_rwlock_rdlock(pthread_rwlock_t *rwlock);__    读锁上锁，如�
 __int pthread_rwlock_wrlock(pthread_rwlock_t *rwlock);__    写锁上锁，会导致读锁和写锁都阻塞，保证了原子操作<br>
 __int pthread_rwlock_unlock(pthread_rwlock_t *rwlock);__    读写锁解锁<br>
 
+### 条件变量
+
+#### 初始化以及清理函数
+__int pthread_cond_init(pthread_cond_t *cv, const pthread_condattr_t *cattr);__<br>
+__int pthread_cond_destroy(pthread_cond_t *cv);__
+
+#### 基本操作
+__int pthread_cond_wait(pthread_cond_t *cv, pthread_mutex_t *mutex);__ 解锁，等待cond信号，加锁<br>
+        函数将解锁mutex参数指向的互斥锁，并使当前线程阻塞在cv参数指向的条件变量上。被阻塞的线程可以被pthread_cond_signal函数，pthread_cond_broadcast函数唤醒，也可能在被信号中断后被唤醒。pthread_cond_wait函数的返回并不意味着条件的值一定发生了变化，必须重新检查条件的值。pthread_cond_wait函数返回时，相应的互斥锁将被当前线程锁定，即使是函数出错返回。一般一个条件表达式都是在一个互斥锁的保护下被检查。当条件表达式未被满足时，线程将仍然阻塞在这个条件变量上。当另一个线程改变了条件的值并向条件变量发出信号时，等待在这个条件变量上的一个线程或所有线程被唤醒，接着都试图再次占有相应的互斥锁。阻塞在条件变量上的线程被唤醒以后，直到pthread_cond_wait()函数返回之前条件的值都有可能发生变化。所以函数返回以后，在锁定相应的互斥锁之前，必须重新测试条件值。最好的测试方法是循环调用pthread_cond_wait函数，并把满足条件的表达式置为循环的终止条件。<br><br>
+__int pthread_cond_timedwait(cond, mutex, abstime);__
+        函数到了一定的时间，即使条件未发生也会解除阻塞。这个时间由参数abstime指定。函数返回时，相应的互斥锁往往是锁定的，即使是函数出错返回。<br><br>
+__int pthread_cond_signal(pthread_cond_t *cv);__
+        函数被用来释放被阻塞在指定条件变量上的一个线程。必须在互斥锁的保护下使用相应的条件变量。否则对条件变量的解锁有可能发生在锁定条件变量之前，从而造成死锁。<br><br>
+__int pthread_cond_broadcast(pthread_cond_t *cv);__
+        函数唤醒所有被pthread_cond_wait函数阻塞在某个条件变量上的线程，参数cv被用来指定这个条件变量。当没有线程阻塞在这个条件变量上时，pthread_cond_broadcast函数无效。由于pthread_cond_broadcast函数唤醒所有阻塞在某个条件变量上的线程，这些线程被唤醒后将再次竞争相应的互斥锁，所以必须小心使用pthread_cond_broadcast函数。<br><br>        
+
 ### 自旋锁
 #### 初始化以及清理函数
 __int pthread_spin_destroy(pthread_spinlock_t *lock);__<br>
@@ -134,12 +150,12 @@ inherit 值PTHREAD_INHERIT_SCHED 表示新建的线程将继承创建者线程�
 #### 基本操作7.设置调度参数
 __int pthread_attr_setschedparam(pthread_attr_t *tattr,const struct sched_param *param);__<br>
 __int pthread_attr_getschedparam(pthread_attr_t *tattr,const struct sched_param *param);__<br>
-                pthread_attr_t tattr;<br>
-                pthread_t tid;<br>
-                int ret;<br>
-                int newprio = 20;<br>
-                sched_param param; <br>
-                
+
+                pthread_attr_t tattr;
+                pthread_t tid;
+                int ret;
+                int newprio = 20;
+                sched_param param;
                 /* initialized with default attributes */
                 ret = pthread_attr_init (&tattr);
                 /* safe to get existing scheduling param */
@@ -154,25 +170,25 @@ __int pthread_attr_getschedparam(pthread_attr_t *tattr,const struct sched_param 
 #### 基本操作8.设置栈大小
 __int pthread_attr_setstacksize(pthread_attr_t *tattr,size_t size);__<br>
 __int pthread_attr_getstacksize(pthread_attr_t *tattr,size_t *size);__<br>
+
                 #include <pthread.h>
                 pthread_attr_t tattr;
                 size_t size;
                 int ret; 
                 size = (PTHREAD_STACK_MIN + 0x4000); 
-                
                 /* setting a new size */
                 ret = pthread_attr_setstacksize(&tattr, size);
 要获取对栈大小的绝对最小限制，请调用宏PTHREAD_STACK_MIN。PTHREAD_STACK_MIN 宏将针对执行NULL 过程的线程返回所需的栈空间量。有用的线程所需的栈大小大于最小栈大小，因此缩小栈大小时应非常谨慎。<br>
 #### 基本操作8.设置栈地址和大小
 __int pthread_attr_setstack(pthread_attr_t *tattr,void *stackaddr,size_t stacksize);__<br>
 __int pthread_attr_getstack(pthread_attr_t *tattr,void * *stackaddr,size_t *stacksize);__<br>
+
                 #include <pthread.h>
                 pthread_attr_t tattr;
                 pthread_t tid;
                 int ret;
                 void *stackbase;
                 size_t size; 
-                
                 /* initialized with default attributes */
                 ret = pthread_attr_init(&tattr);
                 /* setting the base address and size of the stack */
@@ -247,10 +263,32 @@ __PTHREAD_PROCESS_PRIVATE__
 #### 条件变量属性的初始化和反初始化
 __int pthread_condattr_init(pthread_condattr_t  *attr);__
 __int pthread_condattr_destroy(pthread_condattr_t  *attr);__
-#### 设置互斥量共享属性
+#### 设置条件变量共享属性
 __int pthread_condattr_getpshared(const pthread_condattr_t *restrict attr,int *restrict pshared);__  
 __int pthread_condattr_setpshared(pthread_condattr_t *attr,int pshared);__
 __PTHREAD_PROCESS_SHARED__
-    描述:允许可访问用于分配读写锁的内存的任何线程对读写锁进行处理。即使该锁是在由多个进程共享的内存中分配的，也允许对其进行处理。
+    描述:允许可访问用于分配条件变量属性的内存的任何线程对条件变量进行处理。即使该是在由多个进程共享的内存中分配的，也允许对其进行处理。
 __PTHREAD_PROCESS_PRIVATE__
-    描述:读写锁只能由某些线程处理，这些线程与初始化该锁的线程在同一进程中创建。如果不同进程的线程尝试对此类读写锁进行处理，则其行为是不确定的。由进程共享的属性的缺省值为 __PTHREAD_PROCESS_PRIVATE__。
+    描述:条件变量只能由某些线程处理，这些线程与初始化该锁的线程在同一进程中创建。如果不同进程的线程尝试对此类条件变量进行处理，则其行为是不确定的。由进程共享的属性的缺省值为 __PTHREAD_PROCESS_PRIVATE__。
+
+#### 设置条件变量的时钟属性
+__int pthread_condattr_getclock(const pthread_condattr_t *attr, clockid_t *id);__
+__int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t id);__
+        CLOCK_REALTIME				// 实时系统时间
+		CLOCK_MONONIC				// 不带负跳数的实时系统时间
+		CLOCK_PROCESS_CPUTIME_ID	// 调用进程的CPU时间
+		CLOCK_THREAD_CPUTIME_ID		// 调用线程的CPU时间
+    在使用pthread_cond_timedwait前要先设置条件变来个的时钟属性
+
+### 屏障属性
+
+#### 屏障属性的初始化和反初始化
+__int pthread_barrierattr_init(pthread_barrierattr_t *attr);__
+__int pthread_barrierattr_destroy(pthread_barrierattr_t *attr);__
+#### 设置屏障共享属性
+__int pthread_barrierattr_getpshared(const pthread_condattr_t *restrict attr,int *restrict pshared);__  
+__int pthread_barrierattr_setpshared(pthread_condattr_t *attr,int pshared);__
+__PTHREAD_PROCESS_SHARED__
+    描述:允许可访问用于分配屏障的内存的任何线程对屏障进行处理。即使该屏障是在由多个进程共享的内存中分配的，也允许对其进行处理。
+__PTHREAD_PROCESS_PRIVATE__
+    描述:屏障只能由某些线程处理，这些线程与初始化该屏障的线程在同一进程中创建。如果不同进程的线程尝试对此类屏障进行处理，则其行为是不确定的。由进程共享的属性的缺省值为 __PTHREAD_PROCESS_PRIVATE__。
