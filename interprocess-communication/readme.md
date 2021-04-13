@@ -25,3 +25,53 @@ Korn Shell提供了协同进程，但是Bournce-again shell 和C Shell并没有�
 2、当使用 FIFO 的进程退出后，FIFO 文件将继续保存在文件系统中以便以后使用。
 3、FIFO 有名字，不相关的进程可以通过打开命名管道进行通信。
 windows的文件系统不支持FIFO，所以在虚拟机中编译完成后，需要转移到linux目录下测试执行。
+
+## XSI IPC
+        有三种称作XSI IPC的IPC：消息队列，信号量以及共享内存。
+
+### 标识符和键
+        #include <sys/ipc.h>
+        key_t ftok(const char *path,int id);
+当成功执行的时候，一个key_t值将会被返回，否则 -1 被返回。在一般的UNIX实现中，是将文件的索引节点号取出，前面加上子序号得到key_t的返回值。如指定文件的索引节点号为65538，换算成16进制为 0x010002，而你指定的ID值为38，换算成16进制为0x26，则最后的key_t返回值为0x26010002。
+查询文件索引节点号的方法是： ls -i
+
+### 消息队列
+消息队列是消息的链表，存放在内核中并由消息队列标识符表示。消息队列提供了一个从一个进程向另一个进程发送数据块的方法，每个数据块都可以被认为是有一个类型，接受者接受的数据块可以有不同的类型。但是同管道类似，它有一个不足就是每个消息的最大长度是有上限的(MSGMAX)，每个消息队列的总的字节数(MSGMNB)，系统上消息队列的总数上限(MSGMNI)。可以用cat /proc/sys/kernel/msgmax查看具体的数据。
+#### 消息队列的创建
+        #include <sys/types.h>
+        #include <sys/ipc.h>
+        #include <sys/msg.h>
+        int msgget(key_t key, int msgflag);
+key：某个消息队列的名字，用ftok()产生
+msgflag：有两个选项IPC_CREAT和IPC_EXCL，单独使用IPC_CREAT，如果消息队列不存在则创建之，如果存在则打开返回；单独使用IPC_EXCL是没有意义的；两个同时使用，如果消息队列不存在则创建之，如果存在则出错返回。
+返回值：成功返回一个非负整数，即消息队列的标识码，失败返回-1
+#### 消息队列的发送
+        #include <sys/types.h>
+        #include <sys/ipc.h>
+        #include <sys/msg.h>
+        int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+msgid：由msgget函数返回的消息队列标识码
+msgp：指针指向准备发送的消息
+msgze：msgp指向的消息的长度（不包括消息类型的long int长整型）
+msgflg：默认为0
+返回值：成功返回0，失败返回-1
+#### 消息队列的控制
+        #include <sys/types.h>
+        #include <sys/ipc.h>
+        #include <sys/msg.h>
+        int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+msqid：由msgget函数返回的消息队列标识码
+cmd：有三个可选的值，在此我们使用IPC_RMID
+IPC_STAT 把msqid_ds结构中的数据设置为消息队列的当前关联值
+IPC_SET 在进程有足够权限的前提下，把消息队列的当前关联值设置为msqid_ds数据结构中给出的值
+IPC_RMID 删除消息队列
+#### 消息队列的接受
+        #include <sys/types.h>
+        #include <sys/ipc.h>
+        #include <sys/msg.h>
+        ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
+msgsz：缓冲区长度，如果返回的长度大于缓冲区长度，且在flag中设置了MSG_NOERROR，则消息会被截断。如果没有设置，出错返回E2BUG（消息还在队列中）
+msgtyp == 0；返回队列中的第一个消息；
+msgtyp > 0； 返回队列中类型为type的第一个消息；
+msgtyp < 0； 返回队列中消息类型值小于等于type绝对值的消息；如果有若干个，则取类型值最小的信息。
+
