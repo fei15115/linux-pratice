@@ -113,14 +113,54 @@ SETVAL                  用联合体中val成员的值设置信号量集合中�
         #include <sys/ipc.h>
         #include <sys/sem.h>
         int semop(int semid, struct sembuf *sops, unsigned nsops)
-sops：指向进行操作的信号量集结构体数组的首地址，此结构的具体说明如下：<br>
-struct sembuf {<br>
-short semnum;   /*信号量集合中的信号量编号，0代表第1个信号量*/<br>
-short val;      /*若val>0进行V操作信号量值加val，表示进程释放控制的资源 */<br>
-                /*若val<0进行P操作信号量值减val，若(semval-val)<0（semval为该信号量值），则调用进程阻塞，直到资源可用；若设置IPC_NOWAIT不会睡眠，进程直接返回EAGAIN错误*/<br>
-                /*若val==0时阻塞等待信号量为0，调用进程进入睡眠状态，直到信号值为0；若设置IPC_NOWAIT，进程不会睡眠，直接返回EAGAIN错误*/<br>
-short flag;     /*0 设置信号量的默认操作*/<br>
-                /*IPC_NOWAIT设置信号量操作不等待*/<br>
-                /*SEM_UNDO 选项会让内核记录一个与调用进程相关的UNDO记录，如果该进程崩溃，则根据这个进程的UNDO记录自动恢复相应信号量的计数值*/<br>
-};<br>
-nsops：进行操作信号量的个数，即sops结构变量的个数，需大于或等于1。最常见设置此值等于1，只完成对一个信号量的操作<br>
+
+        sops：指向进行操作的信号量集结构体数组的首地址，此结构的具体说明如下：
+        struct sembuf {
+        short semnum;   /*信号量集合中的信号量编号，0代表第1个信号量*/
+        short val;      /*若val>0进行V操作信号量值加val，表示进程释放控制的资源 */
+                        /*若val<0进行P操作信号量值减val，若(semval-val)<0（semval为该信号量值），则调用进程阻塞，直到资源可用；若设置IPC_NOWAIT不会睡眠，进程直接返回EAGAIN错误*/
+                        /*若val==0时阻塞等待信号量为0，调用进程进入睡眠状态，直到信号值为0；若设置IPC_NOWAIT，进程不会睡眠，直接返回EAGAIN错误*/
+        short flag;     /*0 设置信号量的默认操作*/
+                        /*IPC_NOWAIT设置信号量操作不等待*/
+                        /*SEM_UNDO 选项会让内核记录一个与调用进程相关的UNDO记录，如果该进程崩溃，则根据这个进程的UNDO记录自动恢复相应信号量的计数值*/
+        };
+        nsops：进行操作信号量的个数，即sops结构变量的个数，需大于或等于1。最常见设置此值等于1，只完成对一个信号量的操作
+
+### 共享内存
+#### 共享内存的创建
+        #include<sys/shm.h>
+        int shmget(key_t key, size_t size, int shmflg);
+        key：由ftok生成的key标识，标识系统的唯一IPC资源。
+        size：需要申请共享内存的大小。在操作系统中，申请内存的最小单位为页，一页是4k字节，为了避免内存碎片，我们一般申请的内存大小为页的整数倍。
+        shmflg：如果要创建新的共享内存，需要使用IPC_CREAT，IPC_EXCL，如果是已经存在的，可以使用IPC_CREAT或直接传0。
+        返回值：成功时返回一个新建或已经存在的的共享内存标识符，取决于shmflg的参数。失败返回-1并设置错误码。
+**连接**
+        void *shmat(int shmid, const void *shmaddr, int shmflg);
+        shmid：共享存储段的标识符。
+        *shmaddr：shmaddr = 0，则存储段连接到由内核选择的第一个可以地址上（推荐使用）。
+                  shmaddr != 0，并且没有指定SHM_RND，则此段连接到addr所指定的地址上。
+                  shmaddr != 0，并且指定了SHM_RND，如果shmaddr非空并且shmflg指定了选项SHM_RND，那么相应的共享内存映射到由shmaddr参数指定的地址向下舍入一个SHMLAB常值。
+        shmflg：若指定了SHM_RDONLY位，则以只读方式连接此段，否则以读写方式连接此段。
+        返回值：成功返回共享存储段的指针（虚拟地址），并且内核将使其与该共享存储段相关的shmid_ds结构中的shm_nattch计数器加1（类似于引用计数）；出错返回-1。
+**分离**
+        int shmdt(const void *shmaddr);
+        shmaddr：是函数shmat的返回地址，即内核中共享内存区域映射到进程中的地址。
+#### 共享内存的控制
+        #include<sys/shm.h>
+        int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+        shmid：是函数shmget函数返回的共享内存标识符。
+        cmd：对共享内存的操作命令，
+                命令IPC_RMID销毁（destroy）一片共享内存，销毁之后所 有shmat，shmdt，shmctl对该片内存操作都将失效，销毁该共享内存要等到该共享内存 引用计数变为0才进行；
+                IPC_SET命令设置shmid_ds结构成员；
+                IPC_STAT通过buff 参数向调用者返回所指定共享内存区当前的shmid_ds结构；其余命令查看man手册。
+        buf：为指向shmid_ds数据结构；
+#### 共享内存的删除
+        #include<sys/shm.h>
+        int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+        shmid：是函数shmget函数返回的共享内存标识符。
+        cmd：对共享内存的操作命令，
+                命令IPC_RMID销毁（destroy）一片共享内存，销毁之后所 有shmat，shmdt，shmctl对该片内存操作都将失效，销毁该共享内存要等到该共享内存 引用计数变为0才进行；
+                IPC_SET命令设置shmid_ds结构成员；
+                IPC_STAT通过buff 参数向调用者返回所指定共享内存区当前的shmid_ds结构；其余命令查看man手册。
+        buf：为指向shmid_ds数据结构；
+
