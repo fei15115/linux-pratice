@@ -164,3 +164,70 @@ SETVAL                  用联合体中val成员的值设置信号量集合中�
                 IPC_STAT通过buff 参数向调用者返回所指定共享内存区当前的shmid_ds结构；其余命令查看man手册。
         buf：为指向shmid_ds数据结构；
 
+### POSIX信号量
+POSIX信号量有两种形式。命名的和未命名的。他们的差异在于创建和销毁的形式上，其他工作一样。未命名信号量只存在与内存中，并要求能使用信号量的进程必须可以访问内存，这就意味着他们只能应用在同一进程种的线程，或者不同进程种以及映射相同内存到他们地址空间种的线程。但是命名信号量可以通过名字访问，因此可以被任何已知他们名字的线程种使用。
+#### 命名信号量
+##### 命名信号量的创建和释放
+**创建**
+        #include <semaphore.h>
+        sem_t *sem_open(const char *name, int oflag, ... /* mode_t mode, unsigned int value */ );
+        返回值：若成功则返回指向信号量的指针，若出错则返回SEM_FAILED
+        如果使用一个现存的有名信号量，我们只需指定两个参数：信号量名和oflag（oflag取0）。把oflag设置为O_CREAT标志时，如果指定的信号量不存在则新建一个有名信号量；如果指定的信号量已经存在，那么打开使用，无其他额外操作发生。
+
+        如果我们指定O_CREAT标志，那么就需要提供另外两个参数：mode和value。mode用来指定谁可以访问该信号量。它可以取打开文件时所用的权限位的取值。然而，注意通常只有读写权限对我们有用，但是接口不允许在我们打开一个现存的信号量时指定打开模式（mode）。实现通常以读写打开信号量。
+
+        value参数用来指定信号量的初始值。它可取值为：0-SEM_VALUE_MAX。
+
+        如果我们想要确保我们在创建一个新的信号量，可以把oflag参数设置为：O_CREAT|O_EXCL。如果信号量已经存在的话，这会导致sem_open调用失败。
+
+        为了提高移植性，我们在选择信号量名字的时候，必须遵循一定的约定：
+                名字的首字符必须是斜杠（/）。
+                除首字符外，名字中不能再包含其他斜杠（/）。
+                名字的最长长度由实现定义，不应超过_POSIX_NAME_MAX个字符。
+                sem_open函数返回一个信号量指针，该指针可供其他对该信号量进行操作的函数使用。使用完成后，调用sem_close函数释放与信号量相关的资源。
+**释放**
+        #include <semaphore.h>
+        int sem_close(sem_t *sem);
+        返回值：若成功则返回0，出错返回-1
+**销毁**
+        #include <semaphore.h>
+        int sem_unlink(const char *name);
+        返回值：若成功则返回0，出错则返回-1
+##### 命名信号量的基本操作
+
+        #include <semaphore.h>
+        int sem_trywait(sem_t *sem);
+        int sem_wait(sem_t *sem);
+        两个函数返回值：若成功则返回0，出错则返回-1
+        如果信号量计数为0，这时如果调用sem_wait函数，将会阻塞。直到成功对信号量计数减1或被一个信号中断，sem_wait函数才会返回。我们可以使用sem_trywait函数以避免阻塞。当我们调用sem_trywait函数时，如果信号量计数为0，sem_trywait会返回-1，并将errno设置为EAGAIN。
+
+        #include <semaphore.h>
+        #include <time.h>
+        int sem_timedwait(sem_t *restrict sem, const struct timespec *restrict tsptr);
+        返回值：若成功则返回0，出错则返回-1
+        tsptr参数指定了希望等待的绝对时间。如果信号量可以被立即减1，那么超时也无所谓，即使你指定了一个已经过去的时间，试图对信号量减1的操作也会成功。如果直到超时，还不能对信号量计数减1，那么sem_timedwait函数将会返回-1，并将errno设置为ETIMEDOUT。
+
+        #include <semaphore.h>
+        int sem_post(sem_t *sem);
+        返回值：若成功则返回0，出错则返回-1
+        当我们调用sem_post的时，如果此时有因为调用sem_wait或sem_timedwait而阻塞的进程，那么该进程将被唤醒，并且刚刚被sem_post加1的信号量计数紧接着又被sem_wait或sem_timedwait减1。
+
+#### 无名信号量
+##### 无名信号量的基本操作
+        #include <semaphore.h>
+        int sem_init(sem_t *sem, int pshared, unsigned int value);
+        返回值：若成功则返回0，出错返回-1
+        pshared参数指示我们是否要在多进程之间使用该无名信号量。如果要在多个进程之间使用，则将pshared设置为非0值。value参数指定信号量的初始值。
+
+        另外，我们需要声明一个sem_t类型的变量，并把它的地址传给sem_init，以便对该变量进行初始化。如果我们要在两个进程之间使用该无名信号量，我们需要确保sem参数指向这两个进程共享的内存范围内。
+
+        #include <semaphore.h>
+        int sem_destroy(sem_t *sem);
+        返回值：若成功则返回0，出错则返回-1
+        调用sem_destroy后我们将不能再以sem为参数调用任何信号量函数，除非我们再次使用sem_init对sem进行初始化。
+
+        #include <semaphore.h>
+        int sem_getvalue(sem_t *sem, int *restrict valp);
+        返回值：若成功则返回0，出错则返回-1
+        如果sem_getvalue执行成功，信号量的值将存入valp指向的整型变量中。但是，需要小心，我们刚读出来的信号量值可能会改变（因为我们随时可能会使用该信号量值）。如果不采取额外的同步机制的话，sem_getvalue函数仅仅用来调试。
+
