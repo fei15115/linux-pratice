@@ -24,3 +24,24 @@ int socket(int domain,int type,int protocol);<br>
         **IPPROTO_RAW**     原始IP数据包协议<br>
         **IPPROTO_TCP**     传输控制协议<br>
         **IPPROTO_UDP**     用户数据报协议<br>
+### 套接字的删除
+#include <sys/socket.h><br>
+int shutdown(int sockfd, int how);<br>
+
+**how**:SHUT_RD关闭读端；那么无法从套接字读取数据；<br>
+        SHUT_WR关闭写端；那么无法从套接字发送数据；<br>
+        SHUT_RDWR无法读取也无法发送；<br>
+=====================================================
+## 寻址
+### 字节序
+举例 一个32位整数赋值0x04030201<br>
+        小端：CP【0】指向最低有效字节因而包含1，CP【4】包含4；<br>
+        大端：CP【0】指向最高有效字节因而包含4，CP【4】包含1；<br>
+不同的测试平台字节序不同，linux为小端，Solaris为大端；<br>
+网络协议指定了字节序，TCP/IP使用大端字节序。<br>
+#include<arpa/inet.h><br>
+uint32_t htonl(uint32_t hostint32);     返回以网络字节序表示的32位整数<br>
+uint16_t htons(uint16_t hostint16);     返回以网络字节序表示的16位整数<br>
+uint32_t ntohl(uint32_t hostint32);     返回以主机字节序表示的32位整数<br>
+uint32_t ntohs(uint16_t hostint16);     返回以主机字节序表示的32位整数<br>
+
